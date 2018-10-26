@@ -14,16 +14,22 @@ struct MyApp : App {
 
   void onCreate() override {
     phase = 0;
+
+    // configure a mesh
     m.primitive(Mesh::Primitive::TRIANGLE_STRIP);
     m.vertex(0, 0);
     m.vertex(0, 1);
     m.vertex(1, 1);
+
+    // move the camera back so we can see
     nav().pos(0, 0, 5);
   }
 
   void onDraw(Graphics& g) override {
     g.clear(0.1);
     g.color(phase, 1 - phase, phase * phase);
+
+    //
     g.draw(m);
   }
 

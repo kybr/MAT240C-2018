@@ -8,6 +8,6 @@ int main(int argc, char* argv[]) {
   while (true) {
     value += perSampleIncrement;
     if (value > 1) value -= 1;
-    printf("%f\n", value);
+    printf("%f\n", value);  // output format
   }
 }

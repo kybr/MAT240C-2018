@@ -2,9 +2,9 @@
 #define __EVERYTHING__
 
 // C-language stuff
-#include <cmath>
-#include <cstdio>
-#include <cstdlib>
+#include <cmath>    // sin, cos, log
+#include <cstdio>   // printf
+#include <cstdlib>  // rand
 
 // constants specific to audio
 //
