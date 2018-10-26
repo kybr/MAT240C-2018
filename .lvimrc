@@ -1,0 +1,3 @@
+let &l:makeprg="cd ".g:localvimrc_script_dir_unresolved."/allolib && ./run.sh ".expand('%:p')
+inoremap <C-b> <ESC>:make<CR>
+noremap <C-b> :make<CR>

@@ -1,0 +1,20 @@
+{
+	"folders":
+	[
+		{
+			"path": "."
+		}
+	],
+
+	"build_systems":
+  [
+
+    {
+      "name": "AlloLib: ./run.sh FILE",
+      "working_dir": "${project_path:${folder}}",
+      "shell_cmd": "./allolib/run.sh $file"
+    }
+
+  ]
+
+}

@@ -1,3 +1,7 @@
+*.sublime-workspace
+**/bin
+**/build
+
 # Prerequisites
 *.d
 
