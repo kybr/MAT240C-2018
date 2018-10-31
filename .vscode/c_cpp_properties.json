@@ -9,6 +9,7 @@
                 "${workspaceRoot}/allolib/include/al",
                 "${workspaceRoot}/allolib/include/util",
                 "${workspaceRoot}/allolib/external/imgui",
+                "${workspaceRoot}/allolib/external",
                 "${workspaceRoot}/allolib/external/Gamma/Gamma",
                 "${workspaceRoot}/allolib/external/Gamma"
             ],
@@ -17,7 +18,13 @@
                 "path": [
                     "/usr/local/include",
                     "/usr/include",
-                    "${workspaceRoot}/allolib"
+                    "${workspaceRoot}/allolib",
+                    "${workspaceRoot}/allolib/include/al",
+                    "${workspaceRoot}/allolib/include/util",
+                    "${workspaceRoot}/allolib/external/imgui",
+                    "${workspaceRoot}/allolib/external",
+                    "${workspaceRoot}/allolib/external/Gamma/Gamma",
+                    "${workspaceRoot}/allolib/external/Gamma"
                 ]
             },
             "macFrameworkPath": [
