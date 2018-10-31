@@ -12,29 +12,9 @@ Generally, these programs generate or operate on streams of floating point numbe
     sort.cpp     Reorganize into ascending or descending order
     info.cpp     Show statistics: count, mean, minimum, maximum
     reverse.cpp  Reverse the order of numbers
+    fade.cpp     Fade in/out a stream
 
 Build a program like this:
 
-    make FOO # builds FOO.cpp into FOO.exe
-
-For example, here's how my terminal might look:
-
-    $ cd path/to/unix
-    $ make sine
-    c++ -std=c++11 -O0  -gsplit-dwarf -Wall -Wextra -Wno-unused-parameter  -I ./ -o sine.exe sine.cpp
-    chmod 755 sine.exe
-    $ make take
-    c++ -std=c++11 -O0  -gsplit-dwarf -Wall -Wextra -Wno-unused-parameter  -I ./ -o take.exe take.cpp
-    chmod 755 take.exe
-    $ ./sine.exe | ./take 10
-    0.022157
-    0.044292
-    0.066384
-    0.088411
-    0.110350
-    0.132182
-    0.153883
-    0.175433
-    0.196811
-    0.217996
+    make
 
