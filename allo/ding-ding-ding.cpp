@@ -64,9 +64,10 @@ struct Line {
   }
 
   float operator()() {
-    if (value == target) return value;
-    value += increment;
-    if ((increment < 0) ? (value < target) : (value > target)) value = target;
+    if (value != target) {
+      value += increment;
+      if ((increment < 0) ? (value < target) : (value > target)) value = target;
+    }
     return value;
   }
 };
@@ -114,7 +115,7 @@ struct MyApp : App {
       // this inner code block runs once per sample
       if (edge()) {
         sine.frequency(rnd::uniform(220.0, 880.0));
-        line.set(1, 0, 0.3);
+        line.set(1, 0, 0.25);
       }
       float s = sine() * line();
       io.out(0) = s;
