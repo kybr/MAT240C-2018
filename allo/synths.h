@@ -1,6 +1,8 @@
 #ifndef __240C_SYNTHS__
 #define __240C_SYNTHS__
 
+#include <cmath>
+
 namespace diy {
 
 const int SAMPLE_RATE = 44100;
@@ -19,6 +21,58 @@ struct Phasor {
     if (phase > 1) phase -= 1;
     if (phase < 0) phase += 1;
     return phase;
+  }
+};
+
+struct Saw : Phasor {
+  float operator()() { return Phasor::operator()() * 2 - 1; }
+};
+struct Tri : Phasor {
+  float operator()() {
+    float f = Phasor::operator()();
+    return ((f < 0.5) ? f : 1 - f) * 4 - 1;
+  }
+};
+struct Rect : Phasor {
+  float dutyCycle = 0.5;
+  float operator()() { return (Phasor::operator()() < dutyCycle) ? -1 : 1; }
+};
+
+struct Biquad {
+  // x[n-1], x[n-2], y[n-1], y[n-2]
+  float x1, x2, y1, y2;
+  // (normalized) filter coefficients
+  float b0, b1, b2, a1, a2;
+  float operator()(float x0) {
+    // Direct Form 1 with normalized coefficients
+    float y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+    y2 = y1;
+    y1 = y0;
+    x2 = x1;
+    x1 = x0;
+    return y0;
+  }
+  void normalize(float a0) {
+    b0 /= a0;
+    b1 /= a0;
+    b2 /= a0;
+    a1 /= a0;
+    a2 /= a0;
+  }
+  // but.... How do we choose the magic numbers, the coefficients?
+  // We can look in the "audio eq cookbook" and/or we can open Max
+
+  void lpf(float f0, float Q) {
+    float w0 = 2 * M_PI * f0 / SAMPLE_RATE;
+    float alpha = sin(w0) / (2 * Q);
+
+    b0 = (1 - cos(w0)) / 2;
+    b1 = 1 - cos(w0);
+    b2 = (1 - cos(w0)) / 2;
+    a1 = -2 * cos(w0);
+    a2 = 1 - alpha;
+
+    normalize(1 + alpha);
   }
 };
 
