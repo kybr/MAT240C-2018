@@ -2,5 +2,6 @@
   "files.associations": {
     "random": "cpp"
   },
-  "editor.formatOnSave": true
+  "editor.formatOnSave": true,
+  "terminal.integrated.shell.windows": "C:\\Program Files\\Git\\bin\\bash.exe"
 }
