@@ -9,9 +9,9 @@
                 "${workspaceRoot}/allolib/include/al",
                 "${workspaceRoot}/allolib/include/util",
                 "${workspaceRoot}/allolib/external/imgui",
-                "${workspaceRoot}/allolib/external",
-                "${workspaceRoot}/allolib/external/Gamma/Gamma",
-                "${workspaceRoot}/allolib/external/Gamma"
+                "${workspaceRoot}/allolib/external/",
+                "${workspaceRoot}/allolib/external/Gamma/Gamma/",
+                "${workspaceRoot}/allolib/external/Gamma/"
             ],
             "intelliSenseMode": "clang-x64",
             "browse": {
@@ -22,9 +22,9 @@
                     "${workspaceRoot}/allolib/include/al",
                     "${workspaceRoot}/allolib/include/util",
                     "${workspaceRoot}/allolib/external/imgui",
-                    "${workspaceRoot}/allolib/external",
-                    "${workspaceRoot}/allolib/external/Gamma/Gamma",
-                    "${workspaceRoot}/allolib/external/Gamma"
+                    "${workspaceRoot}/allolib/external/",
+                    "${workspaceRoot}/allolib/external/Gamma/Gamma/",
+                    "${workspaceRoot}/allolib/external/Gamma/"
                 ]
             },
             "macFrameworkPath": [
