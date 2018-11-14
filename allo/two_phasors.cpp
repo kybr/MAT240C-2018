@@ -1,57 +1,70 @@
 #include "al/core.hpp"
 #include "al/util/imgui/al_Imgui.hpp"
-#include "al/util/ui/al_ControlGUI.hpp"
-#include "al/util/ui/al_Parameter.hpp"
 using namespace al;
 
+#include "synths.h"
+using namespace diy;
+
 struct MyApp : App {
+  Phasor osc1, osc2;
+  Line offset;
   bool show_gui = true;
   float background = 0.21;
 
-  Parameter x{"x", "gravity", 0.0f, "accelerometer"};
-  Parameter y{"y", "gravity", 0.0f, "accelerometer"};
-  Parameter z{"z", "gravity", 0.0f, "accelerometer"};
-
-  Parameter azimuth{"azimuth", "orientation", 0.0f};
-  Parameter pitch{"pitch", "orientation", 0.0f};
-  Parameter roll{"roll", "orientation", 0.0f};
-
   void onCreate() override {
     initIMGUI();
-    parameterServer() << x << y << z;
-    parameterServer() << azimuth << pitch << roll;
-    parameterServer().print();
-  }
-  void onMessage(osc::Message& m) override {
-    //
-    // override this and do nothing unless you want to print each message
-
-    // m.print();
+    osc1.frequency(220);
+    osc2.frequency(220);
   }
 
   void onAnimate(double dt) override {
+    // pass show_gui for use_input param to turn off interactions
+    // when not showing gui
     beginIMGUI_minimal(show_gui);
     navControl().active(!imgui_is_using_input());
-    //    std::cout << x << std::endl;
-    float f = x;
-    f -= (int)f;
-    background = f;
-
-    Vec3f(x, y, z).print();
-    std::cout << std::endl;
   }
 
+  int operation = 0;
+
+  // 30~60 Hz
   void onDraw(Graphics& g) override {
     g.clear(background);
     ImGui::SliderFloat("grayscale", &background, 0, 1);
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
                 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+    static float offset_target = 0.2;
+    ImGui::SliderFloat("Phase Offset", &offset_target, 0, 1);
+    offset.set(offset_target, 0.05);
+
+    ImGui::SliderInt("Operation (+|-|*)", &operation, 0, 2);
+
+    // TODO: would love to SEE this waveform, graphically
+
     endIMGUI_minimal(show_gui);
   }
 
+  // 86 Hz
   void onSound(AudioIOData& io) override {
     while (io()) {
+      float f = osc1.phase + offset();
+      if (f > 1) f -= 1;
+      osc2.phase = f;
+
       float s = 0;
+      switch (operation) {
+        default:
+        case 0:
+          s = osc1() + osc2();
+          break;
+        case 1:
+          s = osc1() - osc2();
+          break;
+        case 2:
+          s = osc1() * osc2();
+          break;
+      }
+      s *= 0.1;
       io.out(0) = s;
       io.out(1) = s;
     }
@@ -68,6 +81,6 @@ struct MyApp : App {
 
 int main() {
   MyApp app;
-  app.initAudio(44100, 512, 2, 2);
+  app.initAudio(SAMPLE_RATE, BLOCK_SIZE, OUTPUT_CHANNELS, INPUT_CHANNELS);
   app.start();
 }

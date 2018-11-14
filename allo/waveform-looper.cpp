@@ -182,7 +182,7 @@ struct AlloApp : App {
       player.rate(smoothRate());
       float s = player();
       // this makes a horrible glitching noise -- file bug report w/ Lance?
-      // float s = player(1);
+      // float s = player(1); // memory sonification
       io.out(0) = s;
       io.out(1) = s;
     }
