@@ -37,8 +37,8 @@ struct MyApp : App {
     f -= (int)f;
     background = f;
 
-    Vec3f(x, y, z).print();
-    std::cout << std::endl;
+    //    Vec3f(x, y, z).print();
+    //    std::cout << std::endl;
   }
 
   void onDraw(Graphics& g) override {

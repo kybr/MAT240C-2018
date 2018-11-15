@@ -56,6 +56,7 @@ struct MyApp : App {
       // float s = biquad(saw());
       // float s = sine() * line();
       float s = biquad(saw() * line());
+      s *= 0.1;
       io.out(0) = s;
       io.out(1) = s;
     }
