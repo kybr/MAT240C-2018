@@ -16,64 +16,37 @@ using namespace diy;
 #include <vector>
 using namespace std;
 
-// a granulator makes lots of grains. Grain will be class as well as Granulator.
-//
 struct Granulator {
-  // each particular grain is born with a set of parameters that don't
-  // change in its lifetime. these parameters might have been randomly chosen
-  // using some high-level interface, but at a low level, each grain has to have
-  // a concrete set of parameters that govern its playback.
-  //
-  // for each parameter, we should think :
-  // - what are the units, if any, of the parameter?
-  // - what is the appropriate range of values?
-  // - does any parameter depend on this parameter?
-  // - what parameters depend on this parameter?
-  //
   struct Grain {
-    // where does the sound material come from? it comes from a particular
-    // region of a particular buffer.
-    //
-    float* sourceBuffer;     // has samples
-    float positionInSource;  // seconds? samples? normalized (0.0, 1.0)?
-    float length;            // amount of source material
-
-    // how should this grain be played back? when should we play the grain? at
-    // what intensity? with what pitch? what are a few parameters we can
-    // tweak?
-    //
-    bool playbackForward;  // false means play in reverse
-    float playbackRate;    // range: (-1, 1) equation: pow(2, [-1, 1]) * sign
-
-    // our envelope scheme (Marc's Triangle) only takes two parameters:
-    float envelopRiseTime;       // range: (0, 1)
-    float envelopPeakAmplitude;  // range: (0, 1)
-    // int whichEnvelopeIndex;
-
-    float whenItShouldPlay;  // seconds (relative or absolute)
-
-    // what else? should we put more here?
-    bool active;  // true if this grain is for real
+    bool active = false;      // true if this grain is for real
+    Array* source = nullptr;  // where to get sound material
+    Line index;    // index into the the source; captures playback rate
+    Line envelop;  // we can to better; we need an AttackDecay class
+    float amplitude = 1;
+    float operator()() { return amplitude * envelop() * source->get(index()); }
   };
 
   // we should have a set of audio buffers containing sound clips from which we
   // can draw source material for grains.
   //
-  vector<Array> buffer;
+  vector<Array*> buffer;
 
   // we need a container to hold our grains
   //
   vector<Grain> grain;
+
+  Granulator() { grain.resize(100); }
 
   // Properties or parameters of the granulator might be:
   // - density or rate: how often we should make new grains
   // - intensity: the amplitude or loudness of grains
   // - envelop rise time: meh. i'm tire of typing
   //
-  // grain parameters may be chosen randomly, but we would like to limit that
-  // randomness. we would like access to ways of choosing from several kinds of
-  // random distributions: normal, uniform, poisson, etc. so our high level
-  // interface is setting the mean and standard deviation and range of these.
+  // grain parameters may be chosen randomly, but we would like to limit
+  // that randomness. we would like access to ways of choosing from several
+  // kinds of random distributions: normal, uniform, poisson, etc. so our
+  // high level interface is setting the mean and standard deviation and
+  // range of these.
   //
 
   //
@@ -112,7 +85,11 @@ struct MyApp : App {
 
   void onCreate() override {
     initIMGUI();
-    load(granulator, "superstition.wav");
+    load(granulator, "0.wav");
+    load(granulator, "1.wav");
+    load(granulator, "2.wav");
+    load(granulator, "3.wav");
+    load(granulator, "4.wav");
   }
 
   void onAnimate(double dt) override {
@@ -164,14 +141,29 @@ void load(Granulator& granulator, string fileName) {
   SoundFile soundFile;
   soundFile.path(filePath);
   if (!soundFile.openRead()) {
-    cout << " fail!" << endl;
+    cout << "We could not read " << fileName << "!" << endl;
     exit(1);
   }
   if (soundFile.channels() != 1) {
-    cout << " fail!" << endl;
+    cout << fileName << " is not a mono file" << endl;
     exit(1);
   }
-  granulator.buffer.push_back(Array());
-  granulator.buffer.back().resize(soundFile.frames());
-  soundFile.write(granulator.buffer.back().data, soundFile.frames());
+
+  Array* a = new Array();
+  a->size = soundFile.frames();
+  a->data = new float[a->size];
+  soundFile.read(a->data, a->size);
+  granulator.buffer.push_back(a);
+
+  soundFile.close();
+
+  /*
+    cout << a->size << " was size" << endl;
+    for (float f = 1500; f < 1800; f += 0.33333) {
+      float t = a->get(1533.823);
+      // float t = granulator.buffer[3]->get(100.823);
+      cout << "t: " << t << endl;
+    }
+    */
+   
 }
