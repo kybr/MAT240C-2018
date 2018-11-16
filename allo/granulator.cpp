@@ -1,3 +1,6 @@
+#include "Gamma/SoundFile.h"
+using namespace gam;
+
 #include "al/core.hpp"
 #include "al/util/imgui/al_Imgui.hpp"
 using namespace al;
@@ -56,7 +59,7 @@ struct Granulator {
   // we should have a set of audio buffers containing sound clips from which we
   // can draw source material for grains.
   //
-  vector<float*> buffer;
+  vector<Array> buffer;
 
   // we need a container to hold our grains
   //
@@ -99,13 +102,18 @@ struct Granulator {
   }
 };
 
+void load(Granulator& g, string fileName);
+
 struct MyApp : App {
   bool show_gui = true;
   float background = 0.21;
 
   Granulator granulator;
 
-  void onCreate() override { initIMGUI(); }
+  void onCreate() override {
+    initIMGUI();
+    load(granulator, "superstition.wav");
+  }
 
   void onAnimate(double dt) override {
     // pass show_gui for use_input param to turn off interactions
@@ -144,4 +152,26 @@ int main() {
   MyApp app;
   app.initAudio(SAMPLE_RATE, BLOCK_SIZE, OUTPUT_CHANNELS, INPUT_CHANNELS);
   app.start();
+}
+
+// knows how to load a file into the granulator
+//
+void load(Granulator& granulator, string fileName) {
+  SearchPaths searchPaths;
+  searchPaths.addSearchPath("..");
+
+  string filePath = searchPaths.find(fileName).filepath();
+  SoundFile soundFile;
+  soundFile.path(filePath);
+  if (!soundFile.openRead()) {
+    cout << " fail!" << endl;
+    exit(1);
+  }
+  if (soundFile.channels() != 1) {
+    cout << " fail!" << endl;
+    exit(1);
+  }
+  granulator.buffer.push_back(Array());
+  granulator.buffer.back().resize(soundFile.frames());
+  soundFile.write(granulator.buffer.back().data, soundFile.frames());
 }
