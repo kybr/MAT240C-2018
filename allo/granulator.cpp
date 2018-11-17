@@ -17,41 +17,86 @@ using namespace diy;
 using namespace std;
 
 struct Granulator {
+  // knows how to load a file into the granulator
+  //
+  void load(string fileName) {
+    SearchPaths searchPaths;
+    searchPaths.addSearchPath("..");
+
+    string filePath = searchPaths.find(fileName).filepath();
+    SoundFile soundFile;
+    soundFile.path(filePath);
+    if (!soundFile.openRead()) {
+      cout << "We could not read " << fileName << "!" << endl;
+      exit(1);
+    }
+    if (soundFile.channels() != 1) {
+      cout << fileName << " is not a mono file" << endl;
+      exit(1);
+    }
+
+    Array* a = new Array();
+    a->size = soundFile.frames();
+    a->data = new float[a->size];
+    soundFile.read(a->data, a->size);
+    this->soundClip.push_back(a);
+
+    soundFile.close();
+  }
+
+  // we keep a set of sound clips in memory so grains may use them
+  //
+  vector<Array*> soundClip;
+
+  // we define a Grain...
+  //
   struct Grain {
-    bool active = false;
     Array* source = nullptr;
-    Line index;
-    AttackDecay envelop;
+    Line index;  // this is like a tape play head that scrubs through the source
+    AttackDecay envelop;  // new class handles the fade in/out and amplitude
+    bool active = false;
 
     float operator()() {
+      // the next sample from the grain is taken from the source buffer
       float f = envelop() * source->get(index());
-      if (index.done()) {
-        // if the index has reached its goal, then deactivate this grain
-        active = false;
-      }
+
+      // if the index has reached its goal, then deactivate this grain
+      if (index.done()) active = false;
+
       return f;
     }
   };
 
-  vector<Grain> grain;  // stores grains, which are maybe inactive
+  // we store a "pool" of grains which may or may not be active at any time
+  //
+  vector<Grain> grain;
 
   Granulator() {
     // rather than using new/delete and allocating memory on the fly, we just
-    // allocate as many grains as we might need---a fixed number.
+    // allocate as many grains as we might need---a fixed number that we think
+    // will be enough. we can find this number through trial and error. if
+    // too many grains are active, we may take too long in the audio callback
+    // and that will cause drop-outs and glitches.
     //
     grain.resize(1000);
   }
 
-  vector<Array*> soundClip;
+  // this might help us tune the size of the grain pool
+  //
+  int activeGrainCount = 0;
 
   // gui tweakable parameters
   //
-  Edge grainBirth;
-  int whichClip = 0;
+  int whichClip = 0;           // (0, source.size())
   float grainDuration = 0.25;  // in seconds
   float startPosition = 0.25;  // (0, 1)
   float peakPosition = 0.1;    // (0, 1)
-  float amplitudePeak = 0.9;
+  float amplitudePeak = 0.9;   // (0, 1)
+  float playbackRate = 0;      // (-1, 1)
+
+  // this oscillator governs the rate at which grains are created
+  //
+  Edge grainBirth;
 
   // this method makes a new grain out of a dead / inactive one.
   //
@@ -62,6 +107,9 @@ struct Granulator {
     // startTime and endTime are in units of sample
     float startTime = g.source->size * startPosition;
     float endTime = startTime + grainDuration * SAMPLE_RATE;
+    float t = pow(2.0, playbackRate) * grainDuration * SAMPLE_RATE;
+    startTime -= t / 2;
+    endTime += t / 2;
     g.index.set(startTime, endTime, grainDuration);
 
     // riseTime and fallTime are in units of second
@@ -73,14 +121,11 @@ struct Granulator {
     g.active = true;
   }
 
-  int activeGrainCount = 0;
-
   // make the next sample
   //
   float operator()() {
-    // figure out if we should generate (recycle) more grains; do so.
+    // figure out if we should generate (recycle) more grains; then do so.
     //
-    // grainBirth.frequency(noise());
     if (grainBirth()) {
       for (Grain& g : grain)
         if (!g.active) {
@@ -103,8 +148,6 @@ struct Granulator {
   }
 };
 
-void load(Granulator& g, string fileName);
-
 struct MyApp : App {
   bool show_gui = true;
   float background = 0.21;
@@ -113,11 +156,13 @@ struct MyApp : App {
 
   void onCreate() override {
     initIMGUI();
-    load(granulator, "0.wav");
-    load(granulator, "1.wav");
-    load(granulator, "2.wav");
-    load(granulator, "3.wav");
-    load(granulator, "4.wav");
+
+    // load sound files into the
+    granulator.load("0.wav");
+    granulator.load("1.wav");
+    granulator.load("2.wav");
+    granulator.load("3.wav");
+    granulator.load("4.wav");
   }
 
   void onAnimate(double dt) override {
@@ -134,6 +179,7 @@ struct MyApp : App {
 
     ImGui::SliderInt("Sound Clip", &granulator.whichClip, 0, 4);
     ImGui::SliderFloat("Start Position", &granulator.startPosition, 0, 1);
+    ImGui::SliderFloat("Playback Rate", &granulator.playbackRate, -1, 1);
 
     static float volume = -7;
     ImGui::SliderFloat("Loudness", &volume, -42, 0);
@@ -170,40 +216,4 @@ int main() {
   MyApp app;
   app.initAudio(SAMPLE_RATE, BLOCK_SIZE, OUTPUT_CHANNELS, INPUT_CHANNELS);
   app.start();
-}
-
-// knows how to load a file into the granulator
-//
-void load(Granulator& granulator, string fileName) {
-  SearchPaths searchPaths;
-  searchPaths.addSearchPath("..");
-
-  string filePath = searchPaths.find(fileName).filepath();
-  SoundFile soundFile;
-  soundFile.path(filePath);
-  if (!soundFile.openRead()) {
-    cout << "We could not read " << fileName << "!" << endl;
-    exit(1);
-  }
-  if (soundFile.channels() != 1) {
-    cout << fileName << " is not a mono file" << endl;
-    exit(1);
-  }
-
-  Array* a = new Array();
-  a->size = soundFile.frames();
-  a->data = new float[a->size];
-  soundFile.read(a->data, a->size);
-  granulator.soundClip.push_back(a);
-
-  soundFile.close();
-
-  /*
-    cout << a->size << " was size" << endl;
-    for (float f = 1500; f < 1800; f += 0.33333) {
-      float t = a->get(1533.823);
-      // float t = granulator.soundClip[3]->get(100.823);
-      cout << "t: " << t << endl;
-    }
-    */
 }
