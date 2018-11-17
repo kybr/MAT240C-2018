@@ -29,20 +29,6 @@ struct Phasor {
   }
 };
 
-struct Saw : Phasor {
-  float operator()() { return Phasor::operator()() * 2 - 1; }
-};
-struct Tri : Phasor {
-  float operator()() {
-    float f = Phasor::operator()();
-    return ((f < 0.5) ? f : 1 - f) * 4 - 1;
-  }
-};
-struct Rect : Phasor {
-  float dutyCycle = 0.5;
-  float operator()() { return (Phasor::operator()() < dutyCycle) ? -1 : 1; }
-};
-
 struct QuasiBandlimited {
   //
   // from "Synthesis of Quasi-Bandlimited Analog Waveforms Using Frequency
@@ -67,7 +53,7 @@ struct QuasiBandlimited {
   QuasiBandlimited() {
     reset();
     Frequency = 1.0;
-    Filter = 1.0;
+    Filter = 0.85;
     PulseWidth = 0.5;
     recalculate();
   }
@@ -137,7 +123,45 @@ struct QuasiBandlimited {
     last = osc;
     return out * norm;  // store normalized result
   }
+
+  // XXX: make this one work...
+  float tri() { return 0; }
 };
+
+struct Saw : QuasiBandlimited {
+  float operator()() { return saw(); }
+};
+
+struct SawAlias : Phasor {
+  float operator()() { return Phasor::operator()() * 2 - 1; }
+};
+
+struct Rect : QuasiBandlimited {
+  float operator()() { return pulse(); }
+};
+
+struct RectAlias : Phasor {
+  float dutyCycle = 0.5;
+  float operator()() { return (Phasor::operator()() < dutyCycle) ? -1 : 1; }
+};
+
+struct TriAlias : Phasor {
+  float operator()() {
+    float f = Phasor::operator()();
+    return ((f < 0.5) ? f : 1 - f) * 4 - 1;
+  }
+};
+
+// this one is not ready
+/*
+struct Tri : QuasiBandlimited {
+  float value = 0;
+  float operator()() {
+    value += pulse();
+    return value;
+  }
+};
+*/
 
 class Biquad {
   // Audio EQ Cookbook
@@ -268,6 +292,8 @@ struct Array {
   unsigned size = 0;
 
   virtual ~Array() {
+    printf("Array deleted.\n");
+    fflush(stdout);
     if (data) delete[] data;
   }
 
@@ -289,8 +315,17 @@ struct Array {
     }
   }
 
-  // XXX does this work for -1000000.123???
-  float get(const float index) const {
+  float get(float index) const {
+    // allow for sloppy indexing (e.g., negative, huge) by fixing the index to
+    // within the bounds of the array
+    while (index < 0) index += size;
+    while (index > size) index -= size;
+
+    // defer to our method without bounds checking
+    return raw(index);
+  }
+
+  float raw(const float index) const {
     const unsigned i = floor(index);
     const float x0 = data[i];
     const float x1 = data[(i == (size - 1)) ? 0 : i + 1];  // looping semantics
