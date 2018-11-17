@@ -18,60 +18,88 @@ using namespace std;
 
 struct Granulator {
   struct Grain {
-    bool active = false;      // true if this grain is for real
-    Array* source = nullptr;  // where to get sound material
-    Line index;    // index into the the source; captures playback rate
-    Line envelop;  // we can to better; we need an AttackDecay class
-    float amplitude = 1;
-    float operator()() { return amplitude * envelop() * source->get(index()); }
+    bool active = false;
+    Array* source = nullptr;
+    Line index;
+    AttackDecay envelop;
+
+    float operator()() {
+      float f = envelop() * source->get(index());
+      if (index.done()) {
+        // if the index has reached its goal, then deactivate this grain
+        active = false;
+      }
+      return f;
+    }
   };
 
-  // we should have a set of audio buffers containing sound clips from which we
-  // can draw source material for grains.
-  //
-  vector<Array*> buffer;
+  vector<Grain> grain;  // stores grains, which are maybe inactive
 
-  // we need a container to hold our grains
-  //
-  vector<Grain> grain;
+  Granulator() {
+    // rather than using new/delete and allocating memory on the fly, we just
+    // allocate as many grains as we might need---a fixed number.
+    //
+    grain.resize(1000);
+  }
 
-  Granulator() { grain.resize(100); }
+  vector<Array*> soundClip;
 
-  // Properties or parameters of the granulator might be:
-  // - density or rate: how often we should make new grains
-  // - intensity: the amplitude or loudness of grains
-  // - envelop rise time: meh. i'm tire of typing
+  // gui tweakable parameters
   //
-  // grain parameters may be chosen randomly, but we would like to limit
-  // that randomness. we would like access to ways of choosing from several
-  // kinds of random distributions: normal, uniform, poisson, etc. so our
-  // high level interface is setting the mean and standard deviation and
-  // range of these.
-  //
+  Edge grainBirth;
+  int whichClip = 0;
+  float grainDuration = 0.25;  // in seconds
+  float startPosition = 0.25;  // (0, 1)
+  float peakPosition = 0.1;    // (0, 1)
+  float amplitudePeak = 0.9;
 
-  //
+  // this method makes a new grain out of a dead / inactive one.
   //
   void recycle(Grain& g) {
-    // consider this grain as dead; configure all the parameters and make it
-    // active. this is where we use our high-level parameters to choose settings
-    // at a low level.
+    // choose which sound clip this grain pulls from
+    g.source = soundClip[whichClip];
+
+    // startTime and endTime are in units of sample
+    float startTime = g.source->size * startPosition;
+    float endTime = startTime + grainDuration * SAMPLE_RATE;
+    g.index.set(startTime, endTime, grainDuration);
+
+    // riseTime and fallTime are in units of second
+    float riseTime = grainDuration * peakPosition;
+    float fallTime = grainDuration - riseTime;
+    g.envelop.set(riseTime, fallTime, amplitudePeak);
+
+    // permit this grain to sound!
+    g.active = true;
   }
 
-  void density(float gps) {
-    // possible rename: birthrate, grain emmision density, rate
-
-    // change the rate at which we spew new grains
-  }
+  int activeGrainCount = 0;
 
   // make the next sample
   //
   float operator()() {
     // figure out if we should generate (recycle) more grains; do so.
     //
+    // grainBirth.frequency(noise());
+    if (grainBirth()) {
+      for (Grain& g : grain)
+        if (!g.active) {
+          recycle(g);
+          break;
+        }
+    }
+
     // figure out which grains are active. for each active grain, get the next
     // sample; sum all these up and return that sum.
     //
-    return 0;
+    float f = 0;
+    activeGrainCount = 0;
+    for (Grain& g : grain)
+      if (g.active) {
+        activeGrainCount++;
+        f += g();
+      }
+    return f;
   }
 };
 
@@ -101,16 +129,29 @@ struct MyApp : App {
 
   void onDraw(Graphics& g) override {
     g.clear(background);
-    ImGui::SliderFloat("grayscale", &background, 0, 1);
-    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-                1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+    ImGui::Text("Active Grains: %3d", granulator.activeGrainCount);
+    ImGui::SliderFloat("Background", &background, 0, 1);
+
+    ImGui::SliderInt("Sound Clip", &granulator.whichClip, 0, 4);
+    ImGui::SliderFloat("Start Position", &granulator.startPosition, 0, 1);
+
+    static float volume = -7;
+    ImGui::SliderFloat("Loudness", &volume, -42, 0);
+    granulator.amplitudePeak = dbtoa(volume);
+
+    ImGui::SliderFloat("Envelop Parameter", &granulator.peakPosition, 0, 1);
+    ImGui::SliderFloat("Grain Duration", &granulator.grainDuration, 0.001, 0.5);
+
+    static float midi = 10;
+    ImGui::SliderFloat("Birth Frequency", &midi, -16, 85);
+    granulator.grainBirth.frequency(mtof(midi));
 
     endIMGUI_minimal(show_gui);
   }
 
   void onSound(AudioIOData& io) override {
     while (io()) {
-      float s = 0;
+      float s = granulator();
       io.out(0) = s;
       io.out(1) = s;
     }
@@ -153,7 +194,7 @@ void load(Granulator& granulator, string fileName) {
   a->size = soundFile.frames();
   a->data = new float[a->size];
   soundFile.read(a->data, a->size);
-  granulator.buffer.push_back(a);
+  granulator.soundClip.push_back(a);
 
   soundFile.close();
 
@@ -161,9 +202,8 @@ void load(Granulator& granulator, string fileName) {
     cout << a->size << " was size" << endl;
     for (float f = 1500; f < 1800; f += 0.33333) {
       float t = a->get(1533.823);
-      // float t = granulator.buffer[3]->get(100.823);
+      // float t = granulator.soundClip[3]->get(100.823);
       cout << "t: " << t << endl;
     }
     */
-   
 }

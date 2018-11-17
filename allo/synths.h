@@ -10,6 +10,11 @@ const int BLOCK_SIZE = 512;
 const int OUTPUT_CHANNELS = 2;
 const int INPUT_CHANNELS = 2;
 
+float mtof(float m) { return 8.175799f * powf(2.0f, m / 12.0f); }
+float ftom(float f) { return 12.0f * log2f(f / 8.175799f); }
+float dbtoa(float db) { return 1.0f * powf(10.0f, db / 20.0f); }
+float atodb(float a) { return 20.0f * log10f(a / 1.0f); }
+
 struct Phasor {
   float phase = 0.0;        // on the interval [0, 1)
   float increment = 0.001;  // led to an low F
@@ -284,6 +289,7 @@ struct Array {
     }
   }
 
+  // XXX does this work for -1000000.123???
   float get(const float index) const {
     const unsigned i = floor(index);
     const float x0 = data[i];
@@ -325,12 +331,34 @@ struct Line {
     set();
   }
 
+  bool done() { return value == target; }
+
   float operator()() {
     if (value != target) {
       value += increment;
       if ((increment < 0) ? (value < target) : (value > target)) value = target;
     }
     return value;
+  }
+};
+
+struct AttackDecay {
+  Line attack, decay;
+  bool rising;
+
+  void set(float riseTime, float fallTime, float peakValue) {
+    rising = true;
+    attack.set(0, peakValue, riseTime);
+    decay.set(peakValue, 0, fallTime);
+  }
+
+  float operator()() {
+    if (rising) {
+      float f = attack();
+      if (attack.done()) rising = false;
+      return f;
+    }
+    return decay();
   }
 };
 
