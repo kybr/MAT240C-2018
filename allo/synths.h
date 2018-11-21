@@ -152,16 +152,36 @@ struct TriAlias : Phasor {
   }
 };
 
-// this one is not ready
+struct DCblock {
+  float x1 = 0, y1 = 0;
+  float operator()(float in1) {
+    float y = in1 - x1 + y1 * 0.9997;
+    x1 = in1;
+    y1 = y;
+    return y;
+  }
+};
+
 /*
+ * this one is not ready
 struct Tri : QuasiBandlimited {
+  DCblock block, block2;
   float value = 0;
   float operator()() {
-    value += pulse();
-    return value;
+    value += block(pulse());
+    return block2(value);
   }
 };
 */
+
+struct History {
+  float _value = 0;
+  float operator()(float value) {
+    float returnValue = _value;
+    _value = value;
+    return returnValue;
+  }
+};
 
 class Biquad {
   // Audio EQ Cookbook

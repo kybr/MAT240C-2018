@@ -107,9 +107,12 @@ struct Granulator {
     // startTime and endTime are in units of sample
     float startTime = g.source->size * startPosition;
     float endTime = startTime + grainDuration * SAMPLE_RATE;
+
+    // this is actually broken, even though it seems like it works
     float t = pow(2.0, playbackRate) * grainDuration * SAMPLE_RATE;
     startTime -= t / 2;
     endTime += t / 2;
+
     g.index.set(startTime, endTime, grainDuration);
 
     // riseTime and fallTime are in units of second
@@ -163,6 +166,10 @@ struct MyApp : App {
     granulator.load("2.wav");
     granulator.load("3.wav");
     granulator.load("4.wav");
+    granulator.load("5.wav");
+    granulator.load("6.wav");
+    granulator.load("7.wav");
+    granulator.load("8.wav");
   }
 
   void onAnimate(double dt) override {
@@ -177,9 +184,9 @@ struct MyApp : App {
     ImGui::Text("Active Grains: %3d", granulator.activeGrainCount);
     ImGui::SliderFloat("Background", &background, 0, 1);
 
-    ImGui::SliderInt("Sound Clip", &granulator.whichClip, 0, 4);
+    ImGui::SliderInt("Sound Clip", &granulator.whichClip, 0, 8);
     ImGui::SliderFloat("Start Position", &granulator.startPosition, 0, 1);
-    ImGui::SliderFloat("Playback Rate", &granulator.playbackRate, -1, 1);
+    ImGui::SliderFloat("Playback Rate", &granulator.playbackRate, -2, 2);
 
     static float volume = -7;
     ImGui::SliderFloat("Loudness", &volume, -42, 0);
