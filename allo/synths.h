@@ -399,20 +399,14 @@ struct Line {
 
 struct AttackDecay {
   Line attack, decay;
-  bool rising;
 
   void set(float riseTime, float fallTime, float peakValue) {
-    rising = true;
     attack.set(0, peakValue, riseTime);
     decay.set(peakValue, 0, fallTime);
   }
 
   float operator()() {
-    if (rising) {
-      float f = attack();
-      if (attack.done()) rising = false;
-      return f;
-    }
+    if (!attack.done()) return attack();
     return decay();
   }
 };
