@@ -3,6 +3,24 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstdio>
+
+// #define die_unless(message, ...)
+
+#define die(message, ...)                                               \
+  do {                                                                  \
+    fprintf(stderr, "died in %s at line %d with ", __FILE__, __LINE__); \
+    fprintf(stderr, message, ##__VA_ARGS__);                            \
+    fprintf(stderr, "\n");                                              \
+    exit(-1);                                                           \
+  } while (0);
+
+#define info(message, ...)                                          \
+  do {                                                              \
+    fprintf(stderr, "info in %s at line %d: ", __FILE__, __LINE__); \
+    fprintf(stderr, message, ##__VA_ARGS__);                        \
+    fprintf(stderr, "\n");                                          \
+  } while (0);
 
 namespace diy {
 
@@ -20,10 +38,23 @@ struct Phasor {
   float phase = 0.0;        // on the interval [0, 1)
   float increment = 0.001;  // led to an low F
 
-  void frequency(float hertz) { increment = hertz / SAMPLE_RATE; }
+  void frequency(float hertz) {
+    // XXX check for INSANE frequencies
+    if (hertz > SAMPLE_RATE) {
+      printf("hertz > SAMPLE_RATE\n");
+      exit(1);
+    }
+    if (hertz < -SAMPLE_RATE) {
+      printf("hertz < -SAMPLE_RATE\n");
+      exit(1);
+    }
+    increment = hertz / SAMPLE_RATE;
+  }
 
   float operator()() {
     phase += increment;
+
+    // phase wrap.. this only works for frequencies less than the sample rate
     if (phase > 1) phase -= 1;
     if (phase < 0) phase += 1;
     return phase;
@@ -189,10 +220,10 @@ class Biquad {
   // http://www.musicdsp.org/files/Audio-EQ-Cookbook.txt
 
   // x[n-1], x[n-2], y[n-1], y[n-2]
-  float x1, x2, y1, y2;
+  float x1 = 0, x2 = 0, y1 = 0, y2 = 0;
 
   // filter coefficients
-  float b0, b1, b2, a1, a2;
+  float b0 = 1, b1 = 0, b2 = 0, a1 = 0, a2 = 0;
 
  public:
   float operator()(float x0) {
@@ -204,8 +235,6 @@ class Biquad {
     x1 = x0;
     return y0;
   }
-
-  Biquad() { apf(1000.0f, 0.5f); }
 
   void normalize(float a0) {
     b0 /= a0;
@@ -339,8 +368,8 @@ struct Array {
   float get(float index) const {
     // allow for sloppy indexing (e.g., negative, huge) by fixing the index to
     // within the bounds of the array
-    while (index < 0) index += size;
-    while (index > size) index -= size;
+    if (index < 0) index += size;  // -21221488559881683402437427200.000000
+    if (index > size) index -= size;
 
     // defer to our method without bounds checking
     return raw(index);
@@ -364,10 +393,10 @@ struct Array {
 };
 
 struct Line {
-  float value, target, seconds;
-  float increment;
+  float value = 0, target = 0, seconds = 1 / SAMPLE_RATE, increment = 0;
 
   void set() {
+    if (seconds <= 0) seconds = 1 / SAMPLE_RATE;
     // slope per sample
     increment = (target - value) / (seconds * SAMPLE_RATE);
   }

@@ -6,7 +6,7 @@ using namespace al;
 using namespace diy;
 
 struct MyApp : App {
-  Phasor osc1, osc2;
+  Sine osc1, osc2;
   Line offset;
   bool show_gui = true;
   float background = 0.21;

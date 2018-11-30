@@ -3,6 +3,8 @@ using namespace gam;
 
 #include "al/core.hpp"
 #include "al/util/imgui/al_Imgui.hpp"
+#include "al/util/ui/al_ControlGUI.hpp"
+#include "al/util/ui/al_Parameter.hpp"
 using namespace al;
 
 #include "synths.h"
@@ -87,12 +89,13 @@ struct Granulator {
 
   // gui tweakable parameters
   //
-  int whichClip = 0;           // (0, source.size())
-  float grainDuration = 0.25;  // in seconds
-  float startPosition = 0.25;  // (0, 1)
-  float peakPosition = 0.1;    // (0, 1)
-  float amplitudePeak = 0.9;   // (0, 1)
-  float playbackRate = 0;      // (-1, 1)
+  ParameterInt whichClip{"/clip", "", 0, "", 0, 8};
+  Parameter grainDuration{"/duration", "", 0.25, "", 0.001, 1.0};
+  Parameter startPosition{"/position", "", 0.25, "", 0.0, 1.0};
+  Parameter peakPosition{"/envelope", "", 0.1, "", 0.0, 1.0};
+  Parameter amplitudePeak{"/amplitude", "", 0.707, "", 0.0, 1.0};
+  Parameter playbackRate{"/playback", "", 0.0, "", -1.0, 1.0};
+  Parameter birthRate{"/frequency", "", 55, "", 0, 200};
 
   // this oscillator governs the rate at which grains are created
   //
@@ -109,7 +112,7 @@ struct Granulator {
     float endTime = startTime + grainDuration * SAMPLE_RATE;
 
     // this is actually broken, even though it seems like it works
-    float t = pow(2.0, playbackRate) * grainDuration * SAMPLE_RATE;
+    float t = powf(2.0, playbackRate) * grainDuration * SAMPLE_RATE;
     startTime -= t / 2;
     endTime += t / 2;
 
@@ -129,6 +132,7 @@ struct Granulator {
   float operator()() {
     // figure out if we should generate (recycle) more grains; then do so.
     //
+    grainBirth.frequency(birthRate);
     if (grainBirth()) {
       for (Grain& g : grain)
         if (!g.active) {
@@ -156,9 +160,12 @@ struct MyApp : App {
   float background = 0.21;
 
   Granulator granulator;
+  ControlGUI gui;
+  PresetHandler presetHandler{"GranulatorPresets"};
+  PresetServer presetServer{"0.0.0.0", 9011};
 
   void onCreate() override {
-    initIMGUI();
+    // initIMGUI();
 
     // load sound files into the
     granulator.load("0.wav");
@@ -170,36 +177,31 @@ struct MyApp : App {
     granulator.load("6.wav");
     granulator.load("7.wav");
     granulator.load("8.wav");
+
+    gui.init();
+    gui << granulator.whichClip << granulator.grainDuration
+        << granulator.startPosition << granulator.peakPosition
+        << granulator.amplitudePeak << granulator.playbackRate
+        << granulator.birthRate;
+
+    parameterServer() << granulator.whichClip << granulator.grainDuration
+                      << granulator.startPosition << granulator.peakPosition
+                      << granulator.amplitudePeak << granulator.playbackRate
+                      << granulator.birthRate;
+    parameterServer().print();
   }
 
   void onAnimate(double dt) override {
     // pass show_gui for use_input param to turn off interactions
     // when not showing gui
-    beginIMGUI_minimal(show_gui);
-    navControl().active(!imgui_is_using_input());
+    // beginIMGUI_minimal(show_gui);
+    navControl().active(!gui.usingInput());
+    // navControl().active(!imgui_is_using_input());
   }
 
   void onDraw(Graphics& g) override {
     g.clear(background);
-    ImGui::Text("Active Grains: %3d", granulator.activeGrainCount);
-    ImGui::SliderFloat("Background", &background, 0, 1);
-
-    ImGui::SliderInt("Sound Clip", &granulator.whichClip, 0, 8);
-    ImGui::SliderFloat("Start Position", &granulator.startPosition, 0, 1);
-    ImGui::SliderFloat("Playback Rate", &granulator.playbackRate, -2, 2);
-
-    static float volume = -7;
-    ImGui::SliderFloat("Loudness", &volume, -42, 0);
-    granulator.amplitudePeak = dbtoa(volume);
-
-    ImGui::SliderFloat("Envelop Parameter", &granulator.peakPosition, 0, 1);
-    ImGui::SliderFloat("Grain Duration", &granulator.grainDuration, 0.001, 0.5);
-
-    static float midi = 10;
-    ImGui::SliderFloat("Birth Frequency", &midi, -16, 85);
-    granulator.grainBirth.frequency(mtof(midi));
-
-    endIMGUI_minimal(show_gui);
+    gui.draw(g);
   }
 
   void onSound(AudioIOData& io) override {
