@@ -1,6 +1,7 @@
 #ifndef __240C_SYNTHS__
 #define __240C_SYNTHS__
 
+#include <chrono>
 #include <cmath>
 
 namespace diy {
@@ -468,13 +469,15 @@ struct Sine : Table {
 //
 // RAII
 struct BlockTimer {
-  high_resolution_clock::time_point begin;
+  std::chrono::high_resolution_clock::time_point begin;
 
-  BlockTimer() : begin(high_resolution_clock::now()) {}
+  BlockTimer() : begin(std::chrono::high_resolution_clock::now()) {}
 
   ~BlockTimer() {
-    double t = duration<double>(high_resolution_clock::now() - begin).count();
-    if (t > 0) cout << "...took " << t << " seconds." << endl;
+    double t = std::chrono::duration<double>(
+                   std::chrono::high_resolution_clock::now() - begin)
+                   .count();
+    if (t > 0) std::cout << "...took " << t << " seconds." << std::endl;
   }
 };
 
