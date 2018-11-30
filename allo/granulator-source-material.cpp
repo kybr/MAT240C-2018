@@ -18,6 +18,10 @@ using namespace diy;
 #include <vector>
 using namespace std;
 
+struct FloatPair {
+  float l, r;
+};
+
 struct Granulator {
   // knows how to load a file into the granulator
   //
@@ -57,6 +61,7 @@ struct Granulator {
     Line index;  // this is like a tape play head that scrubs through the source
     AttackDecay envelop;  // new class handles the fade in/out and amplitude
     bool active = false;
+    float pan;
 
     float operator()() {
       // the next sample from the grain is taken from the source buffer
@@ -94,6 +99,7 @@ struct Granulator {
   Parameter startPosition{"/position", "", 0.25, "", 0.0, 1.0};
   Parameter peakPosition{"/envelope", "", 0.1, "", 0.0, 1.0};
   Parameter amplitudePeak{"/amplitude", "", 0.707, "", 0.0, 1.0};
+  Parameter panPosition{"/pan", "", 0.5, "", 0.0, 1.0};
   Parameter playbackRate{"/playback", "", 0.0, "", -1.0, 1.0};
   Parameter birthRate{"/frequency", "", 55, "", 0, 200};
 
@@ -123,13 +129,15 @@ struct Granulator {
     float fallTime = grainDuration - riseTime;
     g.envelop.set(riseTime, fallTime, amplitudePeak);
 
+    g.pan = panPosition;
+
     // permit this grain to sound!
     g.active = true;
   }
 
   // make the next sample
   //
-  float operator()() {
+  FloatPair operator()() {
     // figure out if we should generate (recycle) more grains; then do so.
     //
     grainBirth.frequency(birthRate);
@@ -144,19 +152,20 @@ struct Granulator {
     // figure out which grains are active. for each active grain, get the next
     // sample; sum all these up and return that sum.
     //
-    float f = 0;
+    float left = 0, right = 0;
     activeGrainCount = 0;
     for (Grain& g : grain)
       if (g.active) {
         activeGrainCount++;
-        f += g();
+        float f = g();
+        left += f * (1 - g.pan);
+        right += f * g.pan;
       }
-    return f;
+    return {left, right};
   }
 };
 
 struct MyApp : App {
-  bool show_gui = true;
   float background = 0.21;
 
   Granulator granulator;
@@ -165,8 +174,6 @@ struct MyApp : App {
   PresetServer presetServer{"0.0.0.0", 9011};
 
   void onCreate() override {
-    // initIMGUI();
-
     // load sound files into the
     granulator.load("0.wav");
     granulator.load("1.wav");
@@ -181,22 +188,19 @@ struct MyApp : App {
     gui.init();
     gui << granulator.whichClip << granulator.grainDuration
         << granulator.startPosition << granulator.peakPosition
-        << granulator.amplitudePeak << granulator.playbackRate
-        << granulator.birthRate;
+        << granulator.amplitudePeak << granulator.panPosition
+        << granulator.playbackRate << granulator.birthRate;
 
     parameterServer() << granulator.whichClip << granulator.grainDuration
                       << granulator.startPosition << granulator.peakPosition
-                      << granulator.amplitudePeak << granulator.playbackRate
-                      << granulator.birthRate;
+                      << granulator.amplitudePeak << granulator.panPosition
+                      << granulator.playbackRate << granulator.birthRate;
     parameterServer().print();
   }
 
   void onAnimate(double dt) override {
-    // pass show_gui for use_input param to turn off interactions
-    // when not showing gui
-    // beginIMGUI_minimal(show_gui);
     navControl().active(!gui.usingInput());
-    // navControl().active(!imgui_is_using_input());
+    //
   }
 
   void onDraw(Graphics& g) override {
@@ -206,15 +210,9 @@ struct MyApp : App {
 
   void onSound(AudioIOData& io) override {
     while (io()) {
-      float s = granulator();
-      io.out(0) = s;
-      io.out(1) = s;
-    }
-  }
-
-  void onKeyDown(const Keyboard& k) override {
-    if (k.key() == 'g') {
-      show_gui = !show_gui;
+      FloatPair p = granulator();
+      io.out(0) = p.l;
+      io.out(1) = p.r;
     }
   }
 
