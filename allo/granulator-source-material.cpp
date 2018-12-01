@@ -115,12 +115,8 @@ struct Granulator {
 
     // startTime and endTime are in units of sample
     float startTime = g.source->size * startPosition;
-    float endTime = startTime + grainDuration * SAMPLE_RATE;
-
-    // this is actually broken, even though it seems like it works
-    float t = powf(2.0, playbackRate) * grainDuration * SAMPLE_RATE;
-    startTime -= t / 2;
-    endTime += t / 2;
+    float endTime =
+        startTime + grainDuration * SAMPLE_RATE * powf(2.0, playbackRate);
 
     g.index.set(startTime, endTime, grainDuration);
 
