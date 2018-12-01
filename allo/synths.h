@@ -480,11 +480,14 @@ struct Table : Phasor, Array {
 struct Noise : Table {
   Noise(unsigned size = 20 * 44100) {
     resize(size);
-    for (unsigned i = 0; i < size; ++i)
-      data[i] = 2.0f * (random() / float(RAND_MAX)) - 1.0f;
+    for (unsigned i = 0; i < size; ++i) data[i] = rnd::uniformS();
+  }
+};
 
-    // the formula above should already  be normalized
-    // normalize(data, size);
+struct Normal : Table {
+  Normal(unsigned size = 20 * 44100) {
+    resize(size);
+    for (unsigned i = 0; i < size; ++i) data[i] = rnd::normal();
   }
 };
 
