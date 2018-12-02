@@ -15,6 +15,8 @@ using namespace diy;
 //#include <queue>  // priority_queue
 // priority_queue<Grain*> grain;
 
+#include <set>
+#include <stack>
 #include <vector>
 using namespace std;
 
@@ -60,23 +62,19 @@ struct Granulator {
     Array* source = nullptr;
     Line index;  // this is like a tape play head that scrubs through the source
     AttackDecay envelop;  // new class handles the fade in/out and amplitude
-    bool active = false;
     float pan;
 
     float operator()() {
       // the next sample from the grain is taken from the source buffer
-      float f = envelop() * source->get(index());
-
-      // if the index has reached its goal, then deactivate this grain
-      if (index.done()) active = false;
-
-      return f;
+      return envelop() * source->get(index());
     }
   };
 
   // we store a "pool" of grains which may or may not be active at any time
   //
   vector<Grain> grain;
+  set<Grain*> active;
+  stack<Grain*> inactive;
 
   Granulator() {
     // rather than using new/delete and allocating memory on the fly, we just
@@ -86,6 +84,7 @@ struct Granulator {
     // and that will cause drop-outs and glitches.
     //
     grain.resize(1000);
+    for (int i = 0; i < grain.size(); i++) inactive.push(&grain[i]);
   }
 
   // this might help us tune the size of the grain pool
@@ -109,26 +108,23 @@ struct Granulator {
 
   // this method makes a new grain out of a dead / inactive one.
   //
-  void recycle(Grain& g) {
+  void recycle(Grain* g) {
     // choose which sound clip this grain pulls from
-    g.source = soundClip[whichClip];
+    g->source = soundClip[whichClip];
 
     // startTime and endTime are in units of sample
-    float startTime = g.source->size * startPosition;
+    float startTime = g->source->size * startPosition;
     float endTime =
         startTime + grainDuration * SAMPLE_RATE * powf(2.0, playbackRate);
 
-    g.index.set(startTime, endTime, grainDuration);
+    g->index.set(startTime, endTime, grainDuration);
 
     // riseTime and fallTime are in units of second
     float riseTime = grainDuration * peakPosition;
     float fallTime = grainDuration - riseTime;
-    g.envelop.set(riseTime, fallTime, amplitudePeak);
+    g->envelop.set(riseTime, fallTime, amplitudePeak);
 
-    g.pan = panPosition;
-
-    // permit this grain to sound!
-    g.active = true;
+    g->pan = panPosition;
   }
 
   // make the next sample
@@ -138,25 +134,31 @@ struct Granulator {
     //
     grainBirth.frequency(birthRate);
     if (grainBirth()) {
-      for (Grain& g : grain)
-        if (!g.active) {
-          recycle(g);
-          break;
-        }
+      if (!inactive.empty()) {
+        Grain* g = inactive.top();
+        inactive.pop();
+        recycle(g);
+        active.insert(g);
+      }
     }
 
     // figure out which grains are active. for each active grain, get the next
     // sample; sum all these up and return that sum.
     //
     float left = 0, right = 0;
-    activeGrainCount = 0;
-    for (Grain& g : grain)
-      if (g.active) {
-        activeGrainCount++;
-        float f = g();
-        left += f * (1 - g.pan);
-        right += f * g.pan;
-      }
+    forward_list<Grain*> remove;
+    for (auto g : active) {
+      float f = g->operator()();
+      if (g->index.done()) remove.push_front(g);
+      left += f * (1 - g->pan);
+      right += f * g->pan;
+    }
+
+    for (auto e : remove) {
+      active.erase(e);
+      inactive.push(e);
+    }
+
     return {left, right};
   }
 };
