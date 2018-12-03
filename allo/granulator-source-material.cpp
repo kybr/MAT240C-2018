@@ -2,9 +2,9 @@
 using namespace gam;
 
 #include "al/core.hpp"
-#include "al/util/imgui/al_Imgui.hpp"
 #include "al/util/ui/al_ControlGUI.hpp"
 #include "al/util/ui/al_Parameter.hpp"
+#include "al/util/ui/al_Preset.hpp"
 using namespace al;
 
 #include "synths.h"
@@ -195,10 +195,18 @@ struct MyApp : App {
     granulator.load("8.wav");
 
     gui.init();
-    gui << granulator.whichClip << granulator.grainDuration
+    gui << presetHandler  //
+        << granulator.whichClip << granulator.grainDuration
         << granulator.startPosition << granulator.peakPosition
         << granulator.amplitudePeak << granulator.panPosition
         << granulator.playbackRate << granulator.birthRate;
+
+    presetHandler << granulator.whichClip << granulator.grainDuration
+                  << granulator.startPosition << granulator.peakPosition
+                  << granulator.amplitudePeak << granulator.panPosition
+                  << granulator.playbackRate << granulator.birthRate;
+    presetHandler.setMorphTime(1.0);
+    // presetServer << presetHandler;
 
     parameterServer() << granulator.whichClip << granulator.grainDuration
                       << granulator.startPosition << granulator.peakPosition
@@ -224,8 +232,6 @@ struct MyApp : App {
       io.out(1) = p.r;
     }
   }
-
-  void onExit() override { shutdownIMGUI(); }
 };
 
 int main() {
