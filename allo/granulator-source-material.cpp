@@ -110,8 +110,7 @@ struct Granulator {
     // and that will cause drop-outs and glitches.
     //
     grain.resize(1000);
-    // for (auto& g : grain)
-    for (int i = 0; i < grain.size(); i++) bag.insert_inactive(grain[i]);
+    for (auto& g : grain) bag.insert_inactive(g);
   }
 
   // gui tweakable parameters
