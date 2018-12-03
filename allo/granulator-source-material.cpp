@@ -10,18 +10,45 @@ using namespace al;
 #include "synths.h"
 using namespace diy;
 
-// this is for version 2:
-// https://en.cppreference.com/w/cpp/container/priority_queue
-//#include <queue>  // priority_queue
-// priority_queue<Grain*> grain;
-
-#include <set>
-#include <stack>
+#include <forward_list>
+#include <unordered_set>
 #include <vector>
 using namespace std;
 
 struct FloatPair {
   float l, r;
+};
+
+template <typename T>
+class Bag {
+  forward_list<T*> remove, inactive;
+  unordered_set<T*> active;
+
+ public:
+  void insert_inactive(T& t) { inactive.push_front(&t); }
+
+  bool has_inactive() { return !inactive.empty(); }
+
+  T& get_next_inactive() {
+    T* t = inactive.front();
+    active.insert(t);
+    inactive.pop_front();
+    return *t;
+  }
+
+  void for_each_active(function<void(T& t)> f) {
+    for (auto& t : active) f(*t);
+  }
+
+  void schedule_for_deactivation(T& t) { remove.push_front(&t); }
+
+  void execute_deactivation() {
+    for (auto e : remove) {
+      active.erase(e);
+      inactive.push_front(e);
+    }
+    remove.clear();
+  }
 };
 
 struct Granulator {
@@ -70,34 +97,10 @@ struct Granulator {
     }
   };
 
-  template <typename T>
-  class Bag {
-    set<T*> active;
-    forward_list<T*> remove, inactive;
-
-   public:
-    // get any element
-    Grain* get_any_inactive() {
-      if (inactive.empty()) return nullptr;
-      active.insert(inactive.top());
-      inactive.pop();
-      return t;
-    }
-    void schedule_for_deactivation(T* t) { remove.push_front(t); }
-    void execute_deactivation() {
-      for (auto e : remove) {
-        active.erase(e);
-        inactive.push_front(e);
-      }
-    }
-  };
-
   // we store a "pool" of grains which may or may not be active at any time
   //
   vector<Grain> grain;
-  set<Grain*> active;
-  stack<Grain*> inactive;
-  Bag<Grain*> bag;
+  Bag<Grain> bag;
 
   Granulator() {
     // rather than using new/delete and allocating memory on the fly, we just
@@ -107,12 +110,9 @@ struct Granulator {
     // and that will cause drop-outs and glitches.
     //
     grain.resize(1000);
-    for (int i = 0; i < grain.size(); i++) inactive.push(&grain[i]);
+    // for (auto& g : grain)
+    for (int i = 0; i < grain.size(); i++) bag.insert_inactive(grain[i]);
   }
-
-  // this might help us tune the size of the grain pool
-  //
-  int activeGrainCount = 0;
 
   // gui tweakable parameters
   //
@@ -131,23 +131,23 @@ struct Granulator {
 
   // this method makes a new grain out of a dead / inactive one.
   //
-  void recycle(Grain* g) {
+  void recycle(Grain& g) {
     // choose which sound clip this grain pulls from
-    g->source = soundClip[whichClip];
+    g.source = soundClip[whichClip];
 
     // startTime and endTime are in units of sample
-    float startTime = g->source->size * startPosition;
+    float startTime = g.source->size * startPosition;
     float endTime =
         startTime + grainDuration * SAMPLE_RATE * powf(2.0, playbackRate);
 
-    g->index.set(startTime, endTime, grainDuration);
+    g.index.set(startTime, endTime, grainDuration);
 
     // riseTime and fallTime are in units of second
     float riseTime = grainDuration * peakPosition;
     float fallTime = grainDuration - riseTime;
-    g->envelop.set(riseTime, fallTime, amplitudePeak);
+    g.envelop.set(riseTime, fallTime, amplitudePeak);
 
-    g->pan = panPosition;
+    g.pan = panPosition;
   }
 
   // make the next sample
@@ -156,31 +156,20 @@ struct Granulator {
     // figure out if we should generate (recycle) more grains; then do so.
     //
     grainBirth.frequency(birthRate);
-    if (grainBirth()) {
-      if (!inactive.empty()) {
-        Grain* g = inactive.top();
-        inactive.pop();
-        recycle(g);
-        active.insert(g);
-      }
-    }
+    if (grainBirth())
+      if (bag.has_inactive()) recycle(bag.get_next_inactive());
 
     // figure out which grains are active. for each active grain, get the next
     // sample; sum all these up and return that sum.
     //
     float left = 0, right = 0;
-    forward_list<Grain*> remove;
-    for (auto g : active) {
-      float f = g->operator()();
-      if (g->index.done()) remove.push_front(g);
-      left += f * (1 - g->pan);
-      right += f * g->pan;
-    }
-
-    for (auto e : remove) {
-      active.erase(e);
-      inactive.push(e);
-    }
+    bag.for_each_active([&](Grain& g) {
+      float f = g();
+      left += f * (1 - g.pan);
+      right += f * g.pan;
+      if (g.index.done()) bag.schedule_for_deactivation(g);
+    });
+    bag.execute_deactivation();
 
     return {left, right};
   }
