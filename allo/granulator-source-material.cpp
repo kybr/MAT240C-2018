@@ -70,11 +70,34 @@ struct Granulator {
     }
   };
 
+  template <typename T>
+  class Bag {
+    set<T*> active;
+    forward_list<T*> remove, inactive;
+
+   public:
+    // get any element
+    Grain* get_any_inactive() {
+      if (inactive.empty()) return nullptr;
+      active.insert(inactive.top());
+      inactive.pop();
+      return t;
+    }
+    void schedule_for_deactivation(T* t) { remove.push_front(t); }
+    void execute_deactivation() {
+      for (auto e : remove) {
+        active.erase(e);
+        inactive.push_front(e);
+      }
+    }
+  };
+
   // we store a "pool" of grains which may or may not be active at any time
   //
   vector<Grain> grain;
   set<Grain*> active;
   stack<Grain*> inactive;
+  Bag<Grain*> bag;
 
   Granulator() {
     // rather than using new/delete and allocating memory on the fly, we just
