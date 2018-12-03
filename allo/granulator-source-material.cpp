@@ -25,10 +25,17 @@ class Bag {
   unordered_set<T*> active;
 
  public:
+  // add a grain to the container with "inactive" status.
+  //
   void insert_inactive(T& t) { inactive.push_front(&t); }
 
+  // are there any inactive grains?
+  //
   bool has_inactive() { return !inactive.empty(); }
 
+  // find the first inactive grain, make it active, and return it. you better
+  // have called has_inactive() before you call this!
+  //
   T& get_next_inactive() {
     T* t = inactive.front();
     active.insert(t);
@@ -36,12 +43,18 @@ class Bag {
     return *t;
   }
 
+  // run a given function on each active grain.
+  //
   void for_each_active(function<void(T& t)> f) {
     for (auto& t : active) f(*t);
   }
 
+  // schedule an active grain for deactivation.
+  //
   void schedule_for_deactivation(T& t) { remove.push_front(&t); }
 
+  // deactivate all grains scheduled for deactivation.
+  //
   void execute_deactivation() {
     for (auto e : remove) {
       active.erase(e);
