@@ -337,6 +337,16 @@ struct Edge {
   }
 };
 
+struct OnePole {
+  float b0 = 1, a1 = 0, yn1 = 0;
+  void frequency(float hertz) {
+    a1 = exp(-2.0f * 3.14159265358979323846f * hertz / SAMPLE_RATE);
+    b0 = 1.0f - a1;
+  }
+  void period(float seconds) { frequency(1 / seconds); }
+  float operator()(float xn) { return yn1 = b0 * xn + a1 * yn1; }
+};
+
 struct Array {
   float* data = nullptr;
   unsigned size = 0;
@@ -389,6 +399,28 @@ struct Array {
     const float t = index - i;
     data[i] += value * (1 - t);
     data[j] += value * t;
+  }
+};
+
+struct Delay : Array {
+  float delay;
+  unsigned next;
+  Delay(float capacity = 2) {
+    resize(ceil(capacity * SAMPLE_RATE));
+    next = 0;
+  }
+
+  void period(float seconds) { delay = seconds * SAMPLE_RATE; }
+  void frequency(float hertz) { period(1 / hertz); }
+
+  float operator()(float sample) {
+    float index = next - delay;
+    if (index < 0) index += size;
+    float returnValue = get(index);
+    data[next] = data[next] * 0.5 + sample;
+    next++;
+    if (next >= size) next = 0;
+    return returnValue;
   }
 };
 

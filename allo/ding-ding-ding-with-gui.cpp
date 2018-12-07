@@ -5,32 +5,12 @@ using namespace al;
 #include "synths.h"
 using namespace diy;
 
-struct Delay : Array {
-  float delay;
-  unsigned next;
-  Delay(float capacity = 2) {
-    resize(ceil(capacity * SAMPLE_RATE));
-    next = 0;
-  }
-
-  void period(float seconds) { delay = seconds * SAMPLE_RATE; }
-  void frequency(float hertz) { period(1 / hertz); }
-
-  float operator()(float sample) {
-    float index = next - delay;
-    if (index < 0) index += size;
-    float returnValue = get(index);
-    data[next] = sample;
-    next++;
-    if (next >= size) next = 0;
-    return returnValue;
-  }
-};
 
 struct MyApp : App {
   Sine sine;
   Edge edge;
   Line line;
+  Line delayControl;
   bool show_gui = true;
   float grayscale = 0.21;
 
@@ -41,6 +21,7 @@ struct MyApp : App {
     sine.frequency(440);
     edge.period(1.0);
     line.set(1, 0, 0.3);  // start at value, end at value, time to get there
+    delayControl.set(1, 1, 0.1);
     delay.period(0.5);
     // edge.period(0.002);
     // edge.period(0.0000002);
@@ -56,6 +37,10 @@ struct MyApp : App {
     ImGui::SliderFloat("Period", &period, 0.01, 2);
     edge.period(period);
 
+    static float d = 1.0;
+    ImGui::SliderFloat("Delay", &d, 0.01, 2);
+    delayControl.set(d);
+
     ImGui::SliderFloat("Background", &grayscale, 0, 1);
     g.clear(grayscale);
     endIMGUI_minimal(show_gui);
@@ -68,6 +53,7 @@ struct MyApp : App {
         sine.frequency(rnd::uniform(220.0, 880.0));
         line.set(1, 0, 0.4);
       }
+      delay.period(delayControl());
       float s = sine() * line();
       s /= 2;
       s += delay(s) / 2;
