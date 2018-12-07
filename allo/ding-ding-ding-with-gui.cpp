@@ -5,20 +5,25 @@ using namespace al;
 #include "synths.h"
 using namespace diy;
 
-const int N = 44100 * 2;
-struct Delay {
-  // Circular buffer
-  float data[N] = {0};
-  int delay_amount = 22050;
-  int index = 0;  // wrap this
+struct Delay : Array {
+  float delay;
+  unsigned next;
+  Delay(float capacity = 2) {
+    resize(ceil(capacity * SAMPLE_RATE));
+    next = 0;
+  }
 
-  float operator()(float f) {
-    data[index] = data[index] / 5 + f;  // remmeber
-    index = 1 + index;
-    if (index >= N) index = 0;
-    int ago_index = index - delay_amount;
-    if (ago_index < 0) ago_index += N;
-    return data[ago_index];
+  void period(float seconds) { delay = seconds * SAMPLE_RATE; }
+  void frequency(float hertz) { period(1 / hertz); }
+
+  float operator()(float sample) {
+    float index = next - delay;
+    if (index < 0) index += size;
+    float returnValue = get(index);
+    data[next] = sample;
+    next++;
+    if (next >= size) next = 0;
+    return returnValue;
   }
 };
 
@@ -34,8 +39,9 @@ struct MyApp : App {
   void onCreate() override {
     initIMGUI();
     sine.frequency(440);
-    edge.period(0.2);
+    edge.period(1.0);
     line.set(1, 0, 0.3);  // start at value, end at value, time to get there
+    delay.period(0.5);
     // edge.period(0.002);
     // edge.period(0.0000002);
   }
@@ -46,7 +52,7 @@ struct MyApp : App {
   }
 
   void onDraw(Graphics& g) override {
-    static float period = 0.2;
+    static float period = 1.0;
     ImGui::SliderFloat("Period", &period, 0.01, 2);
     edge.period(period);
 
