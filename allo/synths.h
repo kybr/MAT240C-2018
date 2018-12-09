@@ -4,23 +4,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
-
-// #define die_unless(message, ...)
-
-#define die(message, ...)                                               \
-  do {                                                                  \
-    fprintf(stderr, "died in %s at line %d with ", __FILE__, __LINE__); \
-    fprintf(stderr, message, ##__VA_ARGS__);                            \
-    fprintf(stderr, "\n");                                              \
-    exit(-1);                                                           \
-  } while (0);
-
-#define info(message, ...)                                          \
-  do {                                                              \
-    fprintf(stderr, "info in %s at line %d: ", __FILE__, __LINE__); \
-    fprintf(stderr, message, ##__VA_ARGS__);                        \
-    fprintf(stderr, "\n");                                          \
-  } while (0);
+#include <cstdlib>
 
 namespace diy {
 
@@ -33,6 +17,8 @@ float mtof(float m) { return 8.175799f * powf(2.0f, m / 12.0f); }
 float ftom(float f) { return 12.0f * log2f(f / 8.175799f); }
 float dbtoa(float db) { return 1.0f * powf(10.0f, db / 20.0f); }
 float atodb(float a) { return 20.0f * log10f(a / 1.0f); }
+float sigmoid(float x) { return 1 / (1 + expf(-x)); }
+float sigmoid_bipolar(float x) { return 2 * sigmoid(x) - 1; }
 
 struct Phasor {
   float phase = 0.0;        // on the interval [0, 1)
@@ -52,9 +38,11 @@ struct Phasor {
   }
 
   float operator()() {
+    // increment and wrap phase; this only works correctly for frequencies in
+    // (-SAMPLE_RATE, SAMPLE_RATE) because otherwise increment will be greater
+    // than 1 or less than -1 and phase will get away from us.
+    //
     phase += increment;
-
-    // phase wrap.. this only works for frequencies less than the sample rate
     if (phase > 1) phase -= 1;
     if (phase < 0) phase += 1;
     return phase;
@@ -520,6 +508,10 @@ struct Normal : Table {
   Normal(unsigned size = 20 * 44100) {
     resize(size);
     for (unsigned i = 0; i < size; ++i) data[i] = rnd::normal();
+    float maximum = 0;
+    for (unsigned i = 0; i < size; ++i)
+      if (abs(data[i]) > maximum) maximum = abs(data[i]);
+    for (unsigned i = 0; i < size; ++i) data[i] /= maximum;
   }
 };
 
